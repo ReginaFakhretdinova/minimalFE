@@ -81,13 +81,14 @@ matid=np.zeros(mmesh.nelts,dtype=int)
 
 # assemble conductivity matrix.
 t = time.process_time()
-myC=assemble(mmesh,conductivityMatrix,matid,np.array([properties["Conductivity"]]))
+myC=assemble(mmesh,conductivityMatrix,matid,np.array([properties["Conductivity"]]), project_segment_elt)
+fC=assemble(mmesh,conductivityfracMatrix,matid,np.array([properties["Conductivity"]]), project_segment_elt)
 elapsed_time = time.process_time() - t
 print(elapsed_time)
 
 # assemble  mass matrix.
 t = time.process_time()
-myM=assemble(mmesh,massMatrix,matid,np.array([properties["Storage"]]))
+myM=assemble(mmesh,massMatrix,matid,np.array([properties["Storage"]]), project_segment_elt)
 elapsed_time = time.process_time() - t
 print(elapsed_time)
 
