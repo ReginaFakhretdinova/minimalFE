@@ -8,17 +8,64 @@ import matplotlib
 import matplotlib.pyplot as plt
 import time
 
-from mesh.usmesh import usmesh
-from fe.TRI3_Element import *
+from src.mesh.usmesh import usmesh
+from src.mesh.fusmesh import fusmesh
+from src.fe.TRI3_Element import *
+from src.fe.SEG4_Element import *
 from fe.assemble import assemble
 from scipy.sparse.linalg import splu
 from scipy.sparse import csr_matrix
+from src.mesh.mesh_utils import project_segment_elt
 
 import meshio
-
-m = meshio.read("CircleMesh-7.obj")
+m = meshio.read("src/fe/mesh.obj")
 mmesh=usmesh.fromMeshio(m, 1)
 del m
+
+# FRACTURE
+xf1 = -5.0; yf1 = 0.0;
+xf2 = +5.0; yf2 = +0.0;
+# fracture connectivity matrix. 
+j=1; index = dict({"tip1": np.array([], dtype=int), "tip2": np.array([], dtype=int), "boundary": np.array([], dtype=int)})
+for i in range(0,mmesh.nnodes-2): 
+    if sum((mmesh.coor[i] == mmesh.coor[j])*1) == 3: #remember duplicated nodes => FRAC NODES
+        index["boundary"] = np.append(index["boundary"], int(i))
+    j+=1
+    if sum((mmesh.coor[i] == [xf1, yf1, 0])*1) == 3: #find tip 1
+        index["tip1"] = np.append(index["tip1"], int(i))
+    if sum((mmesh.coor[i] == [xf2, yf2, 0])*1) == 3: #find tip 2
+        index["tip2"] = np.append(index["tip2"], int(i))
+
+num = np.size(index["boundary"])
+conn = list()
+for i in range(0, num+1):
+    conn.append(list())
+
+a = np.array([]); b = np.array([]); 
+for i in index["boundary"]:
+    a = np.append(a, np.sum( ( mmesh.coor[index["tip1"]] -mmesh.coor[i]) **2, 1 ) )
+    b = np.append(b, np.sum( ( mmesh.coor[index["tip2"]] -mmesh.coor[i]) **2, 1 ) )
+a = np.argmin(a); b = np.argmin(b) # a – closest to tip1; b – closest to tip2
+conn[0].append(index["tip1"][0]); conn[0].append(index["boundary"][a]); conn[0].append(index["boundary"][a] + 1)
+conn[1].append(conn[0][1]); conn[1].append(conn[0][2])
+index["boundary"] = index["boundary"][index["boundary"] != conn[0][1]]
+
+for i in range(2,num):
+    a = np.array([])
+    for j in index["boundary"]:
+        a = np.append(a, np.sum( ( mmesh.coor[conn[i-1][0]] -mmesh.coor[j]) **2) )
+    a = np.argmin(a)
+    conn[i-1].append(index["boundary"][a])
+    conn[i-1].append(index["boundary"][a] + 1)
+    index["boundary"] = index["boundary"][index["boundary"] != conn[i-1][2]]
+    conn[i].append(conn[i-1][2]); conn[i].append(conn[i-1][3])
+
+conn[num-1].append(index["boundary"][0])
+conn[num-1].append(index["boundary"][0] + 1)
+conn[num].append(index["tip2"][0])
+conn[num].append(conn[num-1][2])
+conn[num].append(conn[num-1][3])
+fmesh=fusmesh(mmesh.dimension, np.array([mmesh.coor[index["boundary"]]], dtype=np.int), conn, np.array([3], dtype=np.int))
 
 ## plotting the unstructured mesh
 triang=matplotlib.tri.Triangulation(mmesh.coor[:,0], mmesh.coor[:,1], triangles=mmesh.conn, mask=None)
