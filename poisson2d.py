@@ -28,6 +28,7 @@ petsc4py.init(sys.argv)
 
 from petsc4py import PETSc
 
+# This code is amazing
 class Poisson2D(object):
 
     def __init__(self, da):
